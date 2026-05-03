@@ -1507,6 +1507,22 @@ def cli_main() -> None:
         if _show_bare_command_group_help(args):
             return
 
+        # Best-effort, idempotent migration. Placed after parse_args and the
+        # bare-help fast path so --help / --version / `deepagents <group>`
+        # exit before any I/O. Wrapped broadly so an unexpected non-OSError
+        # (e.g., RuntimeError from `Path.home()` when $HOME is unset on a CI
+        # runner) cannot crash startup — state migration has zero functional
+        # value vs. failing-soft.
+        try:
+            from deepagents_cli.state_migration import migrate_legacy_state
+
+            migrate_legacy_state()
+        except Exception:
+            logger.warning(
+                "Legacy state migration failed unexpectedly; continuing.",
+                exc_info=True,
+            )
+
         # Import console/settings AFTER arg parsing and after the bare-help
         # fast path so neither argparse's `--help`/`-h` exit nor
         # `deepagents <group>` pays the settings bootstrap cost.
