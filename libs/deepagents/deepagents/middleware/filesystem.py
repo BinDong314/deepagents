@@ -6,6 +6,7 @@ import concurrent.futures
 import contextvars
 import mimetypes
 import uuid
+import hashlib
 from collections.abc import Awaitable, Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath
@@ -1807,11 +1808,14 @@ class FilesystemMiddleware(AgentMiddleware[FilesystemState, ContextT, ResponseT]
             return message, False
 
         # Write content to filesystem
-        sanitized_id = sanitize_tool_call_id(message.tool_call_id)
+        #sanitized_id = sanitize_tool_call_id(message.tool_call_id)
         # Ensure the resulting file name does not exceed OS filename length limits (255 characters)
-        max_len = max(0, 255 - len(self._large_tool_results_prefix) - 1)
-        sanitized_id = sanitized_id[:max_len]
-        file_path = f"{self._large_tool_results_prefix}/{sanitized_id}"
+        #max_len = max(0, 255 - len(self._large_tool_results_prefix) - 1)
+        #sanitized_id = sanitized_id[:max_len]
+        #file_path = f"{self._large_tool_results_prefix}/{sanitized_id}"
+
+        short_id = hashlib.sha256((message.tool_call_id or "").encode()).hexdigest()[:16]
+        file_path = f"{self._large_tool_results_prefix}/{short_id}"
         result = resolved_backend.write(file_path, content_str)
         if result.error:
             return message, False
@@ -1857,11 +1861,12 @@ class FilesystemMiddleware(AgentMiddleware[FilesystemState, ContextT, ResponseT]
             return message, False
 
         # Write content to filesystem using async method
-        sanitized_id = sanitize_tool_call_id(message.tool_call_id)
+        #sanitized_id = sanitize_tool_call_id(message.tool_call_id)
         # Ensure the resulting file name does not exceed OS filename length limits (255 characters)
-        max_len = max(0, 255 - len(self._large_tool_results_prefix) - 1)
-        sanitized_id = sanitized_id[:max_len]
-        file_path = f"{self._large_tool_results_prefix}/{sanitized_id}"
+        #max_len = max(0, 255 - len(self._large_tool_results_prefix) - 1)
+        #sanitized_id = sanitized_id[:max_len]
+        short_id = hashlib.sha256((message.tool_call_id or "").encode()).hexdigest()[:16]
+        file_path = f"{self._large_tool_results_prefix}/{short_id}"
         result = await resolved_backend.awrite(file_path, content_str)
         if result.error:
             return message, False
