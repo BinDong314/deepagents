@@ -1,5 +1,57 @@
 # Changelog
 
+## [0.5.8](https://github.com/BinDong314/deepagents/compare/deepagents==0.5.7...deepagents==0.5.8) (2026-05-07)
+
+
+### Features
+
+* **sdk:** `BASE_AGENT_PROMPT` tweaks ([#2541](https://github.com/BinDong314/deepagents/issues/2541)) ([812eef1](https://github.com/BinDong314/deepagents/commit/812eef185ffda7bc9e6f11425eb5eddc3d3b32e8))
+* **sdk:** `ls_agent_type` configurable tag on subagent runs ([#2788](https://github.com/BinDong314/deepagents/issues/2788)) ([3bcc51a](https://github.com/BinDong314/deepagents/commit/3bcc51a95da80094cfc8bc4bcaf25dc1e2ad8f44))
+* **sdk:** add `artifacts_root` to `CompositeBackend` and middleware ([#2490](https://github.com/BinDong314/deepagents/issues/2490)) ([753ee56](https://github.com/BinDong314/deepagents/commit/753ee567f1cc4d544dc2afea7b414564fd07d37d))
+* **sdk:** add permissions system for filesystem access control ([#2633](https://github.com/BinDong314/deepagents/issues/2633)) ([41dc759](https://github.com/BinDong314/deepagents/commit/41dc7597deb3fc036f1f850e68edc3c0870f27da))
+* **sdk:** add static structured output to subagent response ([#2437](https://github.com/BinDong314/deepagents/issues/2437)) ([6e57731](https://github.com/BinDong314/deepagents/commit/6e57731fc6d908ac1ebe131e782696a4776147e9))
+* **sdk:** deprecate `model=None` in `create_deep_agent` ([#2677](https://github.com/BinDong314/deepagents/issues/2677)) ([149df41](https://github.com/BinDong314/deepagents/commit/149df415d17f3cf3b7eb0bd1e78460112bfa9b04))
+* **sdk:** namespace improvements for deepagents ([#2386](https://github.com/BinDong314/deepagents/issues/2386)) ([66c57e1](https://github.com/BinDong314/deepagents/commit/66c57e1e33e21d5ed0b7ceaa615b0e1c27ac556b))
+* **sdk:** profiles API ([#2892](https://github.com/BinDong314/deepagents/issues/2892)) ([7365ad1](https://github.com/BinDong314/deepagents/commit/7365ad1600064eec616c5de970320104189ddf80))
+* **sdk:** scope permissions to routes for composite backends with sandbox default ([#2659](https://github.com/BinDong314/deepagents/issues/2659)) ([6dd6122](https://github.com/BinDong314/deepagents/commit/6dd612237a7ee707726c4cafc4b691704e4cdb37))
+
+
+### Bug Fixes
+
+* **cli:** prevent stdin hang by passing `DEVNULL` ([#2427](https://github.com/BinDong314/deepagents/issues/2427)) ([5bf5fae](https://github.com/BinDong314/deepagents/commit/5bf5fae8d93beba90628f2f71e3e79817a36ac9e))
+* plumb through generics for `create_deep_agent` ([#2383](https://github.com/BinDong314/deepagents/issues/2383)) ([6c28e22](https://github.com/BinDong314/deepagents/commit/6c28e22cc5768a82b27102adcea4dbb4b5ae6213))
+* remove legacy subagents API ([#2443](https://github.com/BinDong314/deepagents/issues/2443)) ([56bbfd3](https://github.com/BinDong314/deepagents/commit/56bbfd3a7c9fc993f7ea6c54d5c54fca234c2273))
+* **sdk:** `last_updated_at` field doesn't account for task status changes ([#2370](https://github.com/BinDong314/deepagents/issues/2370)) ([8e1a2d6](https://github.com/BinDong314/deepagents/commit/8e1a2d671eda3903d9ebacca4a5e4aa7378646c2))
+* **sdk:** add new line after HEREDOC for edit inline sandbox ([#2340](https://github.com/BinDong314/deepagents/issues/2340)) ([beb4dbb](https://github.com/BinDong314/deepagents/commit/beb4dbb6c75700c6969f2c3bfe8f7bf6046ef3bb))
+* **sdk:** add write preflight and native read to langsmith sandbox ([#2695](https://github.com/BinDong314/deepagents/issues/2695)) ([741221c](https://github.com/BinDong314/deepagents/commit/741221c9d8b65a535816e318ee24d3c19a4bde80))
+* **sdk:** auto-added GP subagent inherits parent permissions ([#3131](https://github.com/BinDong314/deepagents/issues/3131)) ([0d55b3b](https://github.com/BinDong314/deepagents/commit/0d55b3ba8b974d06b1e0f52893f33e44496bff8b))
+* **sdk:** catch `UnicodeDecodeError` in `FilesystemBackend.read` ([#2319](https://github.com/BinDong314/deepagents/issues/2319)) ([9783fe4](https://github.com/BinDong314/deepagents/commit/9783fe43b71ad0fbe30593a263a27f38c6bf8f55))
+* **sdk:** catch PermissionError in FilesystemBackend ripgrep ([#2571](https://github.com/BinDong314/deepagents/issues/2571)) ([3d5d673](https://github.com/BinDong314/deepagents/commit/3d5d67349c8e88e33af98137db9634742f018cb0))
+* **sdk:** default OpenRouter routing to ignore Azure upstream ([#3157](https://github.com/BinDong314/deepagents/issues/3157)) ([01a9113](https://github.com/BinDong314/deepagents/commit/01a911379d368fab8280cd827c38776800abe7b8))
+* **sdk:** fix TypeError in async sub-agents ([#2376](https://github.com/BinDong314/deepagents/issues/2376)) ([8be4a2e](https://github.com/BinDong314/deepagents/commit/8be4a2ee3878a3e15c15d56fd64ba8db248a6328))
+* **sdk:** harden `FilesystemBackend` against symlink loops ([#3035](https://github.com/BinDong314/deepagents/issues/3035)) ([abd02f9](https://github.com/BinDong314/deepagents/commit/abd02f99ef12030bdfe429fdc3ad80a2785bea61))
+* **sdk:** implement upload_files for StateBackend ([#2661](https://github.com/BinDong314/deepagents/issues/2661)) ([5798345](https://github.com/BinDong314/deepagents/commit/579834513a4ba1a024a52fc4edf918f526eab5f2))
+* **sdk:** improvements in default sandbox.write and sandbox.read implementations ([#2321](https://github.com/BinDong314/deepagents/issues/2321)) ([4a37a46](https://github.com/BinDong314/deepagents/commit/4a37a469ffd8a2d3b515c4de72674673f433082b))
+* **sdk:** inherit parent `interrupt_on` for subagents ([#2334](https://github.com/BinDong314/deepagents/issues/2334)) ([acad9bb](https://github.com/BinDong314/deepagents/commit/acad9bb6ceebee7dc74bd75dcffa49faa8697658))
+* **sdk:** match example_agent_descriptions closing tag in task tool prompt ([#2462](https://github.com/BinDong314/deepagents/issues/2462)) ([c36a41c](https://github.com/BinDong314/deepagents/commit/c36a41ccacd46d54806943821ebf16c606a5bc9f))
+* **sdk:** normalize Windows backslash paths before PurePosixPath processing ([#1859](https://github.com/BinDong314/deepagents/issues/1859)) ([e1c1d50](https://github.com/BinDong314/deepagents/commit/e1c1d5024729f5205eaa42bf6a9bc1c93a30d043))
+* **sdk:** preserve CRLF line endings in sandbox edit ([#2899](https://github.com/BinDong314/deepagents/issues/2899)) ([291aebe](https://github.com/BinDong314/deepagents/commit/291aebe21f8a53604a2bf47daa120761dace2536))
+* **sdk:** propagate `CompiledSubAgent` name into `lc_agent_name` metadata ([#3045](https://github.com/BinDong314/deepagents/issues/3045)) ([f671e6b](https://github.com/BinDong314/deepagents/commit/f671e6b18aa49700a535f7b48441662b67dafef9))
+* **sdk:** raise `ValueError` for permission paths without leading slash and path traversal ([#2665](https://github.com/BinDong314/deepagents/issues/2665)) ([723d27d](https://github.com/BinDong314/deepagents/commit/723d27dcdce03cc9ffaa757c70533f0134a43a44))
+* **sdk:** re-export filesystem permission for backwards compatibility ([#3036](https://github.com/BinDong314/deepagents/issues/3036)) ([e04b50a](https://github.com/BinDong314/deepagents/commit/e04b50ae291abefa64ee2750a0c1bbfd93954b32))
+* **sdk:** restore deprecated protocol return types ([#2342](https://github.com/BinDong314/deepagents/issues/2342)) ([845cdf5](https://github.com/BinDong314/deepagents/commit/845cdf52d7f15ab2b260de95f8448c04264c1efc))
+* **sdk:** skill loading should default to 1000 lines ([#2721](https://github.com/BinDong314/deepagents/issues/2721)) ([badc4d3](https://github.com/BinDong314/deepagents/commit/badc4d3921ae0ede4305f44f85fa7266df9465e7))
+* **sdk:** support read-your-writes in StateBackend ([#2991](https://github.com/BinDong314/deepagents/issues/2991)) ([0924869](https://github.com/BinDong314/deepagents/commit/0924869bc3d946577e7c3cbc79a86e4aaf522edd))
+* **sdk:** surface EOF-newline mismatch in `edit_file` ([#3031](https://github.com/BinDong314/deepagents/issues/3031)) ([d30686e](https://github.com/BinDong314/deepagents/commit/d30686ec82d36a0e9430f7c512c34835aba2c079))
+* **sdk:** treat boundary-truncated UTF-8 in `read()` prefix check as text ([#2980](https://github.com/BinDong314/deepagents/issues/2980)) ([c36ebc7](https://github.com/BinDong314/deepagents/commit/c36ebc7be5840e9008279992741c67a8377ffc01))
+* **sdk:** updates for multimodal ([#2514](https://github.com/BinDong314/deepagents/issues/2514)) ([a2edf3e](https://github.com/BinDong314/deepagents/commit/a2edf3ed80e17a87027c41a46283387031ebd3e5))
+* **sdk:** Use configurable directly instead of tracing context for subagent tagging ([#2845](https://github.com/BinDong314/deepagents/issues/2845)) ([bd6ec6b](https://github.com/BinDong314/deepagents/commit/bd6ec6bcebcdcc26f6b79e2c55611074b0e01631))
+
+
+### Performance Improvements
+
+* **sdk:** add cache breakpoint to `MemoryMiddleware` ([#2713](https://github.com/BinDong314/deepagents/issues/2713)) ([1699f3a](https://github.com/BinDong314/deepagents/commit/1699f3aea710985087b16318bb8e6f6e80e02a1b))
+
 ## [0.5.7](https://github.com/langchain-ai/deepagents/compare/deepagents==0.5.6...deepagents==0.5.7) (2026-05-05)
 
 ### Bug Fixes
