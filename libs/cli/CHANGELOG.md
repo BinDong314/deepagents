@@ -1,5 +1,100 @@
 # Changelog
 
+## [0.0.52](https://github.com/BinDong314/deepagents/compare/deepagents-cli==0.0.51...deepagents-cli==0.0.52) (2026-05-07)
+
+
+### Features
+
+* **ci:** include version in workflow run name ([#2627](https://github.com/BinDong314/deepagents/issues/2627)) ([336ffd8](https://github.com/BinDong314/deepagents/commit/336ffd88821114bcbde7408c49483770f0a758b9))
+* **cli:** `--max-turns` flag on non-interactive mode ([#2832](https://github.com/BinDong314/deepagents/issues/2832)) ([567bcd8](https://github.com/BinDong314/deepagents/commit/567bcd8f2065e089f4905a901efe7154add23121))
+* **cli:** `--skill` startup invocation ([#2477](https://github.com/BinDong314/deepagents/issues/2477)) ([5f0f1d4](https://github.com/BinDong314/deepagents/commit/5f0f1d4605de1f1545846e2dbcc29a24c6f138d7))
+* **cli:** `--startup-cmd` flag ([#2841](https://github.com/BinDong314/deepagents/issues/2841)) ([8adcc2c](https://github.com/BinDong314/deepagents/commit/8adcc2c2e612346c263d02d1ec5c33e0d63da5a3))
+* **cli:** `/agents` switcher ([#2558](https://github.com/BinDong314/deepagents/issues/2558)) ([3a2b777](https://github.com/BinDong314/deepagents/commit/3a2b77773a19dd48f9c51dfb35cdfc5c33126d77))
+* **cli:** `/reload` skill diff report ([#3153](https://github.com/BinDong314/deepagents/issues/3153)) ([7c3278a](https://github.com/BinDong314/deepagents/commit/7c3278a46fe1bace82224f43d8e1b7a023d0086a))
+* **cli:** `allowedTools` and `disabledTools` filters in MCP config ([#2835](https://github.com/BinDong314/deepagents/issues/2835)) ([eafd691](https://github.com/BinDong314/deepagents/commit/eafd6912db637ab59085a0b05d6e36d6cdd10e1a))
+* **cli:** `deepagents deploy` ([#2491](https://github.com/BinDong314/deepagents/issues/2491)) ([01dc60e](https://github.com/BinDong314/deepagents/commit/01dc60e394ecb56bd5336e447d32caeed8a67ec2))
+* **cli:** `shift+enter` newline on kitty-capable terminals ([#2869](https://github.com/BinDong314/deepagents/issues/2869)) ([34e6614](https://github.com/BinDong314/deepagents/commit/34e6614a2c6e6a7e33f763ac5b527c13b324a690))
+* **cli:** actionable notifications, update modal ([#2855](https://github.com/BinDong314/deepagents/issues/2855)) ([5fcd368](https://github.com/BinDong314/deepagents/commit/5fcd368088079a84f151e0a3f5e4b9ac29c360c1))
+* **cli:** add env var for launch theme ([#3176](https://github.com/BinDong314/deepagents/issues/3176)) ([47a3e4e](https://github.com/BinDong314/deepagents/commit/47a3e4e219bf43a08697fceabfaddcadc464c97b))
+* **cli:** add permissions to deepagents deploy ([#2651](https://github.com/BinDong314/deepagents/issues/2651)) ([5d93b73](https://github.com/BinDong314/deepagents/commit/5d93b736af6ffb165f33569233d533ced95a6943))
+* **cli:** add splash tips visibility env var ([#3179](https://github.com/BinDong314/deepagents/issues/3179)) ([c9be71c](https://github.com/BinDong314/deepagents/commit/c9be71ce431aadbf24424411a57fada2ed560c93))
+* **cli:** add splash version visibility env var ([#3173](https://github.com/BinDong314/deepagents/issues/3173)) ([f57d09e](https://github.com/BinDong314/deepagents/commit/f57d09e46b965091525817d1e17741ec61aa6274))
+* **cli:** add startup splash env var overrides ([#3175](https://github.com/BinDong314/deepagents/issues/3175)) ([8d3d197](https://github.com/BinDong314/deepagents/commit/8d3d197941c878a409795b870c308f4b761dea5b))
+* **cli:** add TUI footer visibility env vars ([#3171](https://github.com/BinDong314/deepagents/issues/3171)) ([8f5796b](https://github.com/BinDong314/deepagents/commit/8f5796b3704c95c6f775445496177d955eec2da3))
+* **cli:** auto-discover Textual built-in themes ([#3068](https://github.com/BinDong314/deepagents/issues/3068)) ([27894e3](https://github.com/BinDong314/deepagents/commit/27894e336f20f270fb4bb685bf979f24b9bea0bc))
+* **cli:** bundled chat frontend for deepagent deploy ([#2940](https://github.com/BinDong314/deepagents/issues/2940)) ([9bde0c7](https://github.com/BinDong314/deepagents/commit/9bde0c7835ded20e80466d8361f40784141d68d8))
+* **cli:** custom auth via `[auth]` ([#2734](https://github.com/BinDong314/deepagents/issues/2734)) ([417ddaa](https://github.com/BinDong314/deepagents/commit/417ddaab4804a54a8f83721bb8577d65cfa3659f))
+* **cli:** emit `user.name.set` hook during onboarding ([#3177](https://github.com/BinDong314/deepagents/issues/3177)) ([43a494e](https://github.com/BinDong314/deepagents/commit/43a494ed2fe44b7ba3a03d9833301ff3fc485b73))
+* **cli:** external event listener via Unix domain socket ([#3207](https://github.com/BinDong314/deepagents/issues/3207)) ([ffeac22](https://github.com/BinDong314/deepagents/commit/ffeac22f8e5572681ca1ad7c4f2e55ef57207577))
+* **cli:** first-run onboarding flow ([#3102](https://github.com/BinDong314/deepagents/issues/3102)) ([a71f852](https://github.com/BinDong314/deepagents/commit/a71f852df3e491326b8eaa03ee7cb7b3b94fe73d))
+* **cli:** hint `Enter` behavior in `/model` empty state ([#2933](https://github.com/BinDong314/deepagents/issues/2933)) ([7cffa16](https://github.com/BinDong314/deepagents/commit/7cffa16a072bc77def78e4cda09c2e5a2cf8ca39))
+* **cli:** in-TUI API key entry via `/auth` ([#3123](https://github.com/BinDong314/deepagents/issues/3123)) ([eedbc3a](https://github.com/BinDong314/deepagents/commit/eedbc3a8b5f88059636e497f72c7cec5a420f998))
+* **cli:** inline argument hints for slash commands ([#2181](https://github.com/BinDong314/deepagents/issues/2181)) ([6b58e06](https://github.com/BinDong314/deepagents/commit/6b58e06b06f6fb360d85c54eac31953d1e47dd7a))
+* **cli:** persist token count in graph state across sessions ([#2323](https://github.com/BinDong314/deepagents/issues/2323)) ([5be352d](https://github.com/BinDong314/deepagents/commit/5be352d8bb4d266758f3e934f7affbe8d42b0149))
+* **cli:** refresh footer git branch after shell commands ([#2851](https://github.com/BinDong314/deepagents/issues/2851)) ([ee4fddd](https://github.com/BinDong314/deepagents/commit/ee4fddde9454ee8f7ede98ee9a346da6c5ccd3d9))
+* **cli:** render ask-user questions as markdown ([#2339](https://github.com/BinDong314/deepagents/issues/2339)) ([5fbb14a](https://github.com/BinDong314/deepagents/commit/5fbb14a4fd6f2800aec99add1d9f32b88c1d751a))
+* **cli:** rework `/version`, add release-age and editable-install guard ([#2854](https://github.com/BinDong314/deepagents/issues/2854)) ([1ae053f](https://github.com/BinDong314/deepagents/commit/1ae053f347679e58562d2b81eb6d6e6e9bbf0b07))
+* **cli:** rework MCP integration and add OAuth login ([#2906](https://github.com/BinDong314/deepagents/issues/2906)) ([6b7b0be](https://github.com/BinDong314/deepagents/commit/6b7b0bef95db673fed23fc92803abaaa398b0a6d))
+* **cli:** richer provider auth states, hosted Ollama auth ([#3111](https://github.com/BinDong314/deepagents/issues/3111)) ([eeaeb76](https://github.com/BinDong314/deepagents/commit/eeaeb7663515eb0cfa8f0389e7f8446e95e84911))
+* **cli:** set-as-default in `/agents` picker, harden persistence ([#3126](https://github.com/BinDong314/deepagents/issues/3126)) ([4751e33](https://github.com/BinDong314/deepagents/commit/4751e33fbad5945a740cae03bda758223201433b))
+* **cli:** subagents for `deepagents deploy` ([#2786](https://github.com/BinDong314/deepagents/issues/2786)) ([7dd5565](https://github.com/BinDong314/deepagents/commit/7dd5565e30ab91a2cd2ca10fcd227e590451f13c))
+* **cli:** support root/MDM installs ([#2346](https://github.com/BinDong314/deepagents/issues/2346)) ([f618acc](https://github.com/BinDong314/deepagents/commit/f618acc671ca2137df165d6f56e8a46f11c63abb))
+* **cli:** surface MCP config discovery paths and format in help screens ([#3152](https://github.com/BinDong314/deepagents/issues/3152)) ([ce6887c](https://github.com/BinDong314/deepagents/commit/ce6887c89bacee63bdd74ab9d26097e2e418ff43))
+* **cli:** user scoped memory ([#2708](https://github.com/BinDong314/deepagents/issues/2708)) ([23bfca6](https://github.com/BinDong314/deepagents/commit/23bfca6e46e6f3e4fba6657d858ddd5a0b06626f))
+* **cli:** warn on missing tavily key, add `/notifications` ([#2555](https://github.com/BinDong314/deepagents/issues/2555)) ([3dff3ed](https://github.com/BinDong314/deepagents/commit/3dff3ed6835eae9f8b420b8a73c054127faaf7d2))
+* **evals:** add `open-fireworks` model preset ([#3182](https://github.com/BinDong314/deepagents/issues/3182)) ([a748fdd](https://github.com/BinDong314/deepagents/commit/a748fddd1ef463212e28dd0f6d0be6403ed8dd9f))
+* **sdk:** profiles API ([#2892](https://github.com/BinDong314/deepagents/issues/2892)) ([7365ad1](https://github.com/BinDong314/deepagents/commit/7365ad1600064eec616c5de970320104189ddf80))
+
+
+### Bug Fixes
+
+* **cli:** add missing model provider deps to deploy bundler [closes [#2647](https://github.com/BinDong314/deepagents/issues/2647)] ([#2660](https://github.com/BinDong314/deepagents/issues/2660)) ([b710a69](https://github.com/BinDong314/deepagents/commit/b710a69b12e49479045eaa54dfb709326473500b))
+* **cli:** align headless todo guidance with non-interactive mode ([#2459](https://github.com/BinDong314/deepagents/issues/2459)) ([281899b](https://github.com/BinDong314/deepagents/commit/281899bf1932f959f512f94f4c2ac5d76ad32ecb))
+* **cli:** apply `--model-params` on `/model` re-select ([#3072](https://github.com/BinDong314/deepagents/issues/3072)) ([50546dd](https://github.com/BinDong314/deepagents/commit/50546dd3d368af297084929ee3aa91ccf8496fca))
+* **cli:** broken filesystem permissions import ([#3033](https://github.com/BinDong314/deepagents/issues/3033)) ([8d3e684](https://github.com/BinDong314/deepagents/commit/8d3e684b5d104c6b1eb784357fc768f4db20a0bb))
+* **cli:** bug w/ `AGENTS.md` in system prompt twice ([#2652](https://github.com/BinDong314/deepagents/issues/2652)) ([9052be9](https://github.com/BinDong314/deepagents/commit/9052be98d9f4ef9b11a88c9b1df3fae5e5ac666c))
+* **cli:** catch `WorkerCancelled` in `await_prewarm_imports` ([#3178](https://github.com/BinDong314/deepagents/issues/3178)) ([aa0d0f7](https://github.com/BinDong314/deepagents/commit/aa0d0f732680a917bfc407f61f689326006be163))
+* **cli:** dismiss slash command autocomplete on space ([#2478](https://github.com/BinDong314/deepagents/issues/2478)) ([02e46bc](https://github.com/BinDong314/deepagents/commit/02e46bc4cc470d93f5ab3ca05252ef1ffe87c3e7))
+* **cli:** fail fast on missing provider credentials ([#2554](https://github.com/BinDong314/deepagents/issues/2554)) ([50fb8ae](https://github.com/BinDong314/deepagents/commit/50fb8aefe7e3065024e10f1d5ecd11a54d736641))
+* **cli:** fix mktemp template in debug script for macOS ([#2603](https://github.com/BinDong314/deepagents/issues/2603)) ([63fa537](https://github.com/BinDong314/deepagents/commit/63fa537e9995ca2ead492ee44902227567e9a130))
+* **cli:** gate agent-swap resume hint on server checkpoint ([#2862](https://github.com/BinDong314/deepagents/issues/2862)) ([f14b9cd](https://github.com/BinDong314/deepagents/commit/f14b9cd3cc41f92ddb089d4294cba8496d517807))
+* **cli:** gate async task tools by actual names ([#3094](https://github.com/BinDong314/deepagents/issues/3094)) ([aae8dfe](https://github.com/BinDong314/deepagents/commit/aae8dfebab184586322129ec162e083ebfd372cc))
+* **cli:** guard against textual cursor/document desync crash ([#2494](https://github.com/BinDong314/deepagents/issues/2494)) ([c14a748](https://github.com/BinDong314/deepagents/commit/c14a7483ed92428ec2241dd8254cdab9c26a6a4f))
+* **cli:** harden deploy config parsing and add unit tests ([#2636](https://github.com/BinDong314/deepagents/issues/2636)) ([0469d14](https://github.com/BinDong314/deepagents/commit/0469d1429d129e604fc1b622263923162f719314))
+* **cli:** hide approval menu on selection ([#3097](https://github.com/BinDong314/deepagents/issues/3097)) ([7dafd30](https://github.com/BinDong314/deepagents/commit/7dafd3049ad7725353bbf12bf80f476b52916208))
+* **cli:** honor SDK `ProviderProfile` defaults in `create_model` ([#2962](https://github.com/BinDong314/deepagents/issues/2962)) ([6fb0446](https://github.com/BinDong314/deepagents/commit/6fb0446626aa0395c7b3c45142a0b36eb7469c3a))
+* **cli:** keep thinking spinner visible during text streaming ([#2849](https://github.com/BinDong314/deepagents/issues/2849)) ([2cb2244](https://github.com/BinDong314/deepagents/commit/2cb22446bc1351d20e8bbfa9f23b5d668947351f))
+* **cli:** load project .env before deploy/dev config validation ([#2644](https://github.com/BinDong314/deepagents/issues/2644)) ([8299091](https://github.com/BinDong314/deepagents/commit/829909166606f8a9d9571b00da725845bad08da7))
+* **cli:** mark token count as approximate after interrupted generation ([#2353](https://github.com/BinDong314/deepagents/issues/2353)) ([cb9a0c7](https://github.com/BinDong314/deepagents/commit/cb9a0c7ad2f9421471b4276a33beabc30588b694))
+* **cli:** move internal state under hidden directory ([#3106](https://github.com/BinDong314/deepagents/issues/3106)) ([ef4c717](https://github.com/BinDong314/deepagents/commit/ef4c71763086a4e4899ba7ced6f9eb478d38069e))
+* **cli:** normalize serialized message dicts in `/offload` ([#2808](https://github.com/BinDong314/deepagents/issues/2808)) ([0d11bd4](https://github.com/BinDong314/deepagents/commit/0d11bd46fd682c7aa3f008918771e9759dca7352))
+* **cli:** preserve recent agent across thread resume ([#3108](https://github.com/BinDong314/deepagents/issues/3108)) ([442a0d4](https://github.com/BinDong314/deepagents/commit/442a0d474aa1e767d542cb01f6e338431c18e5a8))
+* **cli:** queue `/model` switches during server startup ([#2895](https://github.com/BinDong314/deepagents/issues/2895)) ([6ed7b65](https://github.com/BinDong314/deepagents/commit/6ed7b65a40ac5bd926e94edd944bd552e8d6b5b4))
+* **cli:** re-show thinking spinner on hitl/`ask_user` resume ([#2847](https://github.com/BinDong314/deepagents/issues/2847)) ([34a6167](https://github.com/BinDong314/deepagents/commit/34a6167b0c275c7e4da067ef276a837f60da2f8a))
+* **cli:** recover from failed server startup via `/model` ([#3056](https://github.com/BinDong314/deepagents/issues/3056)) ([6ee375e](https://github.com/BinDong314/deepagents/commit/6ee375e979b672cd1d172669f0e5a7a665431d7c))
+* **cli:** reject out-of-tree symlinked project `AGENTS.md` ([#3039](https://github.com/BinDong314/deepagents/issues/3039)) ([4618098](https://github.com/BinDong314/deepagents/commit/4618098e59c8c8d1d3f91354e4f4163a9582f710))
+* **cli:** resolve conflicting langsmith env var precedence ([#2455](https://github.com/BinDong314/deepagents/issues/2455)) ([b6997d8](https://github.com/BinDong314/deepagents/commit/b6997d830c8c2822acbaa0ad672bdec873af2b9d))
+* **cli:** restore ctrl+j newline keybinding ([#2827](https://github.com/BinDong314/deepagents/issues/2827)) ([2e1a3f4](https://github.com/BinDong314/deepagents/commit/2e1a3f45a9ff56390e294ea5b0f6a837200874ec))
+* **cli:** show detached HEAD commit in local context ([#3144](https://github.com/BinDong314/deepagents/issues/3144)) ([569d4f0](https://github.com/BinDong314/deepagents/commit/569d4f0d7d699bace7820eb171a6bd605b2a1a18))
+* **cli:** show server startup error instead of generic agent message ([#2397](https://github.com/BinDong314/deepagents/issues/2397)) ([a3e1e93](https://github.com/BinDong314/deepagents/commit/a3e1e9365178ad14d7233ae577bb87d714daff5c))
+* **cli:** sort MCP tools deterministically for prompt-cache stability ([#2497](https://github.com/BinDong314/deepagents/issues/2497)) ([39b43cf](https://github.com/BinDong314/deepagents/commit/39b43cf8d0f44827f3b2faf32843c7db436539e8))
+* **cli:** startup import deadlock ([#3017](https://github.com/BinDong314/deepagents/issues/3017)) ([d40ab57](https://github.com/BinDong314/deepagents/commit/d40ab57800a6ad12b0c9a5e249753702ec0832c8))
+* **cli:** stop loading widget timer leak ([#2396](https://github.com/BinDong314/deepagents/issues/2396)) ([01d3d86](https://github.com/BinDong314/deepagents/commit/01d3d864098c4e96527082b2bd1755ac6591b098))
+* **cli:** support modified backspace word deletion ([#3037](https://github.com/BinDong314/deepagents/issues/3037)) ([bc3d019](https://github.com/BinDong314/deepagents/commit/bc3d01916d2ba34be07d56c9eb9b813008c1584c))
+* **cli:** throttle update notification to once per day and fix teardown banner ([#2764](https://github.com/BinDong314/deepagents/issues/2764)) ([ba31294](https://github.com/BinDong314/deepagents/commit/ba31294b733d4ef542d18830eec6df30cfa0d23f))
+* **sdk:** default OpenRouter routing to ignore Azure upstream ([#3157](https://github.com/BinDong314/deepagents/issues/3157)) ([01a9113](https://github.com/BinDong314/deepagents/commit/01a911379d368fab8280cd827c38776800abe7b8))
+
+
+### Performance Improvements
+
+* **cli:** `O(1)` message lookups in `MessageStore` ([#2350](https://github.com/BinDong314/deepagents/issues/2350)) ([d39fd5d](https://github.com/BinDong314/deepagents/commit/d39fd5d3651fd87d1eea8c02cbef2c2f62449e67))
+* **cli:** skip runtime imports for bare command help ([#3107](https://github.com/BinDong314/deepagents/issues/3107)) ([9cc4f58](https://github.com/BinDong314/deepagents/commit/9cc4f5837b8d705f3e5f604b6e6affa39876b2f5))
+
+
+### Reverted Changes
+
+* **cli:** broken filesystem permissions import ([#3040](https://github.com/BinDong314/deepagents/issues/3040)) ([00699be](https://github.com/BinDong314/deepagents/commit/00699bee9d26c753b629a1b73f439987082af047))
+
 ## [0.0.51](https://github.com/langchain-ai/deepagents/compare/deepagents-cli==0.0.50...deepagents-cli==0.0.51) (2026-05-05)
 
 ### Features
