@@ -6229,20 +6229,32 @@ class DeepAgentsApp(App):
             event.stop()
 
     def on_app_focus(self) -> None:
-        """Restore chat input focus when the terminal regains OS focus.
+        """Restore chat input focus and resume cursor blink on terminal focus regain.
 
         When the user opens a link via `webbrowser.open`, OS focus shifts to
         the browser. On returning to the terminal, Textual fires `AppFocus`
         (requires a terminal that supports FocusIn events). Re-focusing the chat
         input here keeps it ready for typing.
         """
-        if not self._chat_input:
+        if self._chat_input is None:
             return
+        self._chat_input.set_cursor_blink(blink=True)
         if isinstance(self.screen, ModalScreen):
             return
         if self._pending_approval_widget or self._pending_ask_user_widget:
             return
         self._chat_input.focus_input()
+
+    def on_app_blur(self) -> None:
+        """Pause the chat input cursor blink when the terminal loses OS focus.
+
+        `TextArea` pauses its own blink when its `has_focus` flips, but
+        `AppBlur` does not change widget focus, so we toggle `cursor_blink`
+        manually.
+        """
+        if self._chat_input is None:
+            return
+        self._chat_input.set_cursor_blink(blink=False)
 
     def on_click(self, event: Click) -> None:
         """Handle clicks anywhere in the terminal.

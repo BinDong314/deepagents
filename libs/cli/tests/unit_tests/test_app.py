@@ -2682,6 +2682,84 @@ class TestAppFocusRestoresChatInput:
 
             mock_focus.assert_not_called()
 
+    async def test_app_focus_resumes_blink_with_modal_open(self) -> None:
+        """Blink should resume on focus regain even when a modal blocks refocus."""
+        app = DeepAgentsApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert app._chat_input is not None
+            assert app._chat_input._text_area is not None
+
+            from deepagents_cli.widgets.thread_selector import ThreadSelectorScreen
+
+            app.push_screen(ThreadSelectorScreen(current_thread=None))
+            await pilot.pause()
+            assert isinstance(app.screen, ModalScreen)
+
+            app._chat_input._text_area.cursor_blink = False
+            app.on_app_focus()
+            await pilot.pause()
+
+            assert app._chat_input._text_area.cursor_blink is True
+
+    async def test_app_focus_resumes_blink_with_approval_pending(self) -> None:
+        """Blink should resume on focus regain even when an approval is pending."""
+        app = DeepAgentsApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert app._chat_input is not None
+            assert app._chat_input._text_area is not None
+
+            app._pending_approval_widget = MagicMock()
+            app._chat_input._text_area.cursor_blink = False
+
+            app.on_app_focus()
+            await pilot.pause()
+
+            assert app._chat_input._text_area.cursor_blink is True
+
+
+class TestAppBlurPausesCursorBlink:
+    """Test `on_app_blur` pauses cursor blink without changing widget focus."""
+
+    async def test_app_blur_pauses_blink(self) -> None:
+        """Losing terminal focus should pause the chat input cursor blink."""
+        app = DeepAgentsApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert app._chat_input is not None
+            assert app._chat_input._text_area is not None
+            assert app._chat_input._text_area.cursor_blink is True
+
+            app.on_app_blur()
+            await pilot.pause()
+
+            assert app._chat_input._text_area.cursor_blink is False
+
+    async def test_app_blur_preserves_widget_focus(self) -> None:
+        """Pausing blink must not blur the chat input widget."""
+        app = DeepAgentsApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            assert app._chat_input is not None
+            assert app._chat_input._text_area is not None
+            app._chat_input._text_area.focus()
+            await pilot.pause()
+
+            app.on_app_blur()
+            await pilot.pause()
+
+            assert app._chat_input._text_area.has_focus is True
+
+    async def test_app_blur_noop_before_mount(self) -> None:
+        """`on_app_blur` should silently ignore blur events before mount."""
+        app = DeepAgentsApp()
+        async with app.run_test() as pilot:
+            await pilot.pause()
+            app._chat_input = None
+
+            app.on_app_blur()
+
 
 class TestPasteRouting:
     """Tests app-level paste routing when chat input focus lags."""
