@@ -49,6 +49,7 @@ _TIPS: dict[str, int] = {
     "Use /skill:<name> to invoke a skill directly": 1,
     "Type /update to check for and install updates": 1,
     "Use /theme to customize the CLI colors and style": 1,
+    "In /theme, press N to toggle labels/keys, T to set for the current terminal": 1,
     "Use /skill-creator to build reusable agent skills": 1,
     "Use /auto-update to toggle automatic CLI updates": 1,
     "Use /agents to browse and switch between your available agents": 2,
