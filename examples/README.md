@@ -12,6 +12,14 @@
   Agents, patterns, and applications you can build with Deep Agents.
 </p>
 
+### Featured: Open SWE
+
+[**Open SWE**](https://github.com/langchain-ai/open-swe) is a flagship example of an open-source, async coding agent for your org's internal workflows. We use it heavily! It's composed on `create_deep_agent`, runs each task in an isolated cloud sandbox, integrates with Slack, Linear, and GitHub, and ships PRs end-to-end. Open SWE lives in its own repo so it can move quickly and stay deployable as a standalone product.
+
+Read more:
+
+- [Open SWE: An Open-Source Framework for Internal Coding Agents](https://blog.langchain.com/open-swe-an-open-source-framework-for-internal-coding-agents/) — the current architecture and how it composes on Deep Agents
+
 | Example | Description |
 |---------|-------------|
 | [deep_research](deep_research/) | Multi-step web research agent using Tavily for URL discovery, parallel sub-agents, and strategic reflection |
