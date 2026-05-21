@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Literal, overload
+import hashlib
 
 import wcmatch.glob as wcglob
 
@@ -104,10 +105,11 @@ def _normalize_content(file_data: FileData) -> str:
 def sanitize_tool_call_id(tool_call_id: str) -> str:
     r"""Sanitize tool_call_id to prevent path traversal and separator issues.
 
-    Replaces dangerous characters (., /, \) with underscores.
+    Uses SHA256 hashing to ensure the ID is safe and well within OS filename limits.
     """
-    sanitized = tool_call_id.replace(".", "_").replace("/", "_").replace("\\", "_")
-    return sanitized[:200]
+    if not tool_call_id:
+        return "unknown"
+    return hashlib.sha256(tool_call_id.encode()).hexdigest()[:16]
 
 
 def format_content_with_line_numbers(
