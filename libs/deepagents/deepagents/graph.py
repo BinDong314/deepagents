@@ -56,7 +56,7 @@ from deepagents.profiles.harness.harness_profiles import (
     _apply_profile_prompt,
     _harness_profile_for_model,
 )
-from deepagents.deepagents.middleware.large_tool_results import LargeToolEvictionMiddleware
+from deepagents.middleware.large_tool_results import LargeToolEvictionMiddleware
 
 logger = logging.getLogger(__name__)
 
