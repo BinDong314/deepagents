@@ -626,7 +626,7 @@ def create_deep_agent(  # noqa: C901, PLR0912, PLR0915  # Complex graph assembly
             #     custom_tool_descriptions=_profile.tool_description_overrides,
             #     _permissions=permissions,
             # ),
-            LargeToolEvictionMiddleware(backend=backend)
+            LargeToolEvictionMiddleware(backend=backend),
             create_summarization_middleware(model, backend),
             PatchToolCallsMiddleware(),
         ]
