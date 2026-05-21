@@ -40,7 +40,7 @@ from deepagents.backends import StateBackend
 from deepagents.backends.protocol import BackendFactory, BackendProtocol
 from deepagents.middleware._tool_exclusion import _ToolExclusionMiddleware
 from deepagents.middleware.async_subagents import AsyncSubAgent, AsyncSubAgentMiddleware
-from deepagents.middleware.filesystem import FilesystemMiddleware, FilesystemPermission
+from deepagents.middleware.filesystem import FilesystemPermission
 from deepagents.middleware.memory import MemoryMiddleware
 from deepagents.middleware.patch_tool_calls import PatchToolCallsMiddleware
 from deepagents.middleware.skills import SkillsMiddleware
@@ -56,6 +56,7 @@ from deepagents.profiles.harness.harness_profiles import (
     _apply_profile_prompt,
     _harness_profile_for_model,
 )
+from libs.deepagents.deepagents.middleware.large_tool_results import LargeToolEvictionMiddleware
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +186,7 @@ def get_default_model() -> ChatAnthropic:
 
 
 _REQUIRED_MIDDLEWARE: tuple[tuple[type[AgentMiddleware[Any, Any, Any]], tuple[str, ...]], ...] = (
-    (FilesystemMiddleware, ()),
+    (LargeToolEvictionMiddleware, ()),
     (SubAgentMiddleware, ()),
 )
 """Scaffolding middleware that core deep agent features depend on.
@@ -547,11 +548,12 @@ def create_deep_agent(  # noqa: C901, PLR0912, PLR0915  # Complex graph assembly
             # Build middleware: base stack + skills (if specified) + user's middleware
             subagent_middleware: list[AgentMiddleware[Any, Any, Any]] = [
                 TodoListMiddleware(),
-                FilesystemMiddleware(
-                    backend=backend,
-                    custom_tool_descriptions=_subagent_profile.tool_description_overrides,
-                    _permissions=subagent_permissions,
-                ),
+                # FilesystemMiddleware(
+                #     backend=backend,
+                #     custom_tool_descriptions=_subagent_profile.tool_description_overrides,
+                #     _permissions=subagent_permissions,
+                # ),
+                LargeToolEvictionMiddleware(backend=backend),
                 create_summarization_middleware(subagent_model, backend),
                 PatchToolCallsMiddleware(),
             ]
@@ -619,11 +621,12 @@ def create_deep_agent(  # noqa: C901, PLR0912, PLR0915  # Complex graph assembly
     if gp_profile.enabled is not False and not any(spec["name"] == GENERAL_PURPOSE_SUBAGENT["name"] for spec in inline_subagents):
         gp_middleware: list[AgentMiddleware[Any, Any, Any]] = [
             TodoListMiddleware(),
-            FilesystemMiddleware(
-                backend=backend,
-                custom_tool_descriptions=_profile.tool_description_overrides,
-                _permissions=permissions,
-            ),
+            # FilesystemMiddleware(
+            #     backend=backend,
+            #     custom_tool_descriptions=_profile.tool_description_overrides,
+            #     _permissions=permissions,
+            # ),
+            LargeToolEvictionMiddleware(backend=backend)
             create_summarization_middleware(model, backend),
             PatchToolCallsMiddleware(),
         ]
@@ -675,11 +678,7 @@ def create_deep_agent(  # noqa: C901, PLR0912, PLR0915  # Complex graph assembly
     if skills is not None:
         deepagent_middleware.append(SkillsMiddleware(backend=backend, sources=skills))
     deepagent_middleware.append(
-        FilesystemMiddleware(
-            backend=backend,
-            custom_tool_descriptions=_profile.tool_description_overrides,
-            _permissions=permissions,
-        )
+        LargeToolEvictionMiddleware(backend=backend)
     )
     sub_agent_middleware: SubAgentMiddleware | None = None
     if inline_subagents:
