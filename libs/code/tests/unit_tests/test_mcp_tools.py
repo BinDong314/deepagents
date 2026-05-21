@@ -859,13 +859,22 @@ class TestGetMCPTools:
                 "transport": "stdio",
             }
         ]
+        empty_schema: dict[str, Any] = {"type": "object", "properties": {}}
         assert server_infos == [
             MCPServerInfo(
                 name="srv",
                 transport="stdio",
                 tools=(
-                    MCPToolInfo(name="srv_read_file", description="Read a file"),
-                    MCPToolInfo(name="srv_write_file", description="Write a file"),
+                    MCPToolInfo(
+                        name="srv_read_file",
+                        description="Read a file",
+                        input_schema=empty_schema,
+                    ),
+                    MCPToolInfo(
+                        name="srv_write_file",
+                        description="Write a file",
+                        input_schema=empty_schema,
+                    ),
                 ),
             )
         ]
@@ -959,6 +968,148 @@ class TestGetMCPTools:
         await _load_tools_from_config(config)
         assert recorded[0]["env"] is None
 
+    async def test_input_schema_is_carried_into_mcp_tool_info(
+        self,
+        write_config: Callable[..., str],
+        fake_create_session: tuple[AsyncMock, list[dict[str, Any]]],
+    ) -> None:
+        """Per-tool `inputSchema` lands on `MCPToolInfo.input_schema`."""
+        path = write_config(
+            {"mcpServers": {"srv": {"command": "node", "args": ["server.js"]}}}
+        )
+        session, _recorded = fake_create_session
+        rich_schema = {
+            "type": "object",
+            "properties": {
+                "path": {"type": "string"},
+                "depth": {"type": "integer"},
+            },
+            "required": ["path"],
+        }
+        session.list_tools = AsyncMock(
+            return_value=_make_tool_page(
+                [
+                    _make_mcp_tool(
+                        "read_file", "Read a file", input_schema=rich_schema
+                    ),
+                ]
+            )
+        )
+
+        _tools, manager, server_infos = await get_mcp_tools(path)
+
+        assert server_infos[0].tools[0].input_schema == rich_schema
+        await manager.cleanup()  # type: ignore[union-attr]
+
+    async def test_input_schema_extraction_survives_attribute_error(
+        self,
+        write_config: Callable[..., str],
+        fake_create_session: tuple[AsyncMock, list[dict[str, Any]]],
+    ) -> None:
+        """If `mcp_tool.inputSchema` access raises, schema falls back to `None`.
+
+        The downstream LangChain conversion still needs `inputSchema`, so we
+        give the tool a minimal valid schema there but use a custom property
+        to make `getattr` raise during the schema-extraction path.
+        """
+        path = write_config(
+            {"mcpServers": {"srv": {"command": "node", "args": ["server.js"]}}}
+        )
+        session, _recorded = fake_create_session
+
+        class _ExplodingSchemaTool:
+            name = "read_file"
+            description = "Read a file"
+            annotations = None
+            meta = None
+            _access_count = 0
+
+            @property
+            def inputSchema(self) -> dict[str, Any]:  # noqa: N802 - matches MCP spec
+                self._access_count += 1
+                if self._access_count == 1:
+                    # Allow LangChain conversion to succeed first.
+                    return {"type": "object", "properties": {}}
+                msg = "metadata access failed"
+                raise AttributeError(msg)
+
+        session.list_tools = AsyncMock(
+            return_value=_make_tool_page(
+                [_ExplodingSchemaTool()]  # type: ignore[list-item]
+            )
+        )
+
+        _tools, manager, server_infos = await get_mcp_tools(path)
+
+        assert server_infos[0].tools[0].input_schema is None
+        await manager.cleanup()  # type: ignore[union-attr]
+
+    async def test_input_schema_pairs_when_tool_name_starts_with_server_prefix(
+        self,
+        write_config: Callable[..., str],
+        fake_create_session: tuple[AsyncMock, list[dict[str, Any]]],
+    ) -> None:
+        """A bare tool name that itself starts with the server prefix still pairs.
+
+        Server `srv` exposing tool `srv_read` produces LangChain name
+        `srv_srv_read`. The schema dict is keyed by the LC name directly, so
+        the lookup is unambiguous regardless of how the bare name happens
+        to look. (Regression guard for the prior `removeprefix`-based path.)
+        """
+        path = write_config(
+            {"mcpServers": {"srv": {"command": "node", "args": ["server.js"]}}}
+        )
+        session, _recorded = fake_create_session
+        schema = {"type": "object", "properties": {"x": {"type": "string"}}}
+        session.list_tools = AsyncMock(
+            return_value=_make_tool_page(
+                [_make_mcp_tool("srv_read", "Read", input_schema=schema)]
+            )
+        )
+
+        _tools, manager, server_infos = await get_mcp_tools(path)
+
+        info = server_infos[0]
+        assert [t.name for t in info.tools] == ["srv_srv_read"]
+        assert info.tools[0].input_schema == schema
+        await manager.cleanup()  # type: ignore[union-attr]
+
+    async def test_input_schema_paired_to_post_filter_tools(
+        self,
+        write_config: Callable[..., str],
+        fake_create_session: tuple[AsyncMock, list[dict[str, Any]]],
+    ) -> None:
+        """When `disabledTools` filters out a tool, surviving tools keep schemas."""
+        path = write_config(
+            {
+                "mcpServers": {
+                    "srv": {
+                        "command": "node",
+                        "args": ["server.js"],
+                        "disabledTools": ["write_file"],
+                    }
+                }
+            }
+        )
+        session, _recorded = fake_create_session
+        read_schema = {"type": "object", "properties": {"path": {"type": "string"}}}
+        write_schema = {"type": "object", "properties": {"path": {"type": "string"}}}
+        session.list_tools = AsyncMock(
+            return_value=_make_tool_page(
+                [
+                    _make_mcp_tool("read_file", "Read", input_schema=read_schema),
+                    _make_mcp_tool("write_file", "Write", input_schema=write_schema),
+                ]
+            )
+        )
+
+        _tools, manager, server_infos = await get_mcp_tools(path)
+
+        names = [t.name for t in server_infos[0].tools]
+        assert names == ["srv_read_file"]
+        assert server_infos[0].tools[0].input_schema == read_schema
+        await manager.cleanup()  # type: ignore[union-attr]
+
 
 @pytest.mark.usefixtures("fake_home")
 class TestLoadToolsFromConfigOAuth:
@@ -992,7 +1143,7 @@ class TestLoadToolsFromConfigOAuth:
         assert tools == []
         assert isinstance(manager, MCPSessionManager)
         assert server_infos[0].status == "unauthenticated"
-        assert "deepagents mcp login notion" in (server_infos[0].error or "")
+        assert "re-authentication" in (server_infos[0].error or "")
         await manager.cleanup()
 
     async def test_existing_tokens_attach_oauth_provider(
@@ -1076,7 +1227,7 @@ class TestLoadToolsFromConfigOAuth:
         assert tools == []
         assert isinstance(manager, MCPSessionManager)
         assert server_infos[0].status == "unauthenticated"
-        assert "deepagents mcp login notion" in (server_infos[0].error or "")
+        assert "re-authentication" in (server_infos[0].error or "")
         await manager.cleanup()
 
 
@@ -1270,6 +1421,115 @@ class TestResolveAndLoadMcpTools:
 
         merged = mock_load.call_args.args[0]
         assert "remote" in merged["mcpServers"]
+
+    @patch("deepagents_code.mcp_tools._load_tools_from_config")
+    @patch("deepagents_code.mcp_tools.discover_mcp_configs")
+    async def test_disabled_server_is_split_off(
+        self,
+        mock_discover: MagicMock,
+        mock_load: AsyncMock,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """A disabled server is removed from the loader payload and surfaced as info."""
+        cfg = tmp_path / "mcp.json"
+        cfg.write_text(
+            json.dumps(
+                {
+                    "mcpServers": {
+                        "fs": {"command": "npx", "args": []},
+                        "off": {"command": "node", "args": []},
+                    },
+                },
+            ),
+        )
+        mock_discover.return_value = [cfg]
+        mock_load.return_value = ([], None, [])
+        monkeypatch.setattr(
+            "deepagents_code.mcp_disabled.get_disabled_servers",
+            lambda *_a, **_k: {"off"},
+        )
+
+        _tools, _manager, infos = await resolve_and_load_mcp_tools(
+            trust_project_mcp=True,
+        )
+
+        merged = mock_load.call_args.args[0]
+        assert "fs" in merged["mcpServers"]
+        assert "off" not in merged["mcpServers"]
+        disabled = [i for i in infos if i.status == "disabled"]
+        assert len(disabled) == 1
+        assert disabled[0].name == "off"
+        assert disabled[0].transport == "stdio"
+
+    @patch("deepagents_code.mcp_tools._load_tools_from_config")
+    @patch("deepagents_code.mcp_tools.discover_mcp_configs")
+    async def test_all_servers_disabled_short_circuits_loader(
+        self,
+        mock_discover: MagicMock,
+        mock_load: AsyncMock,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """When every configured server is disabled, the loader is never called."""
+        cfg = tmp_path / "mcp.json"
+        cfg.write_text(
+            json.dumps(
+                {"mcpServers": {"fs": {"command": "npx", "args": []}}},
+            ),
+        )
+        mock_discover.return_value = [cfg]
+        mock_load.return_value = ([], None, [])
+        monkeypatch.setattr(
+            "deepagents_code.mcp_disabled.get_disabled_servers",
+            lambda *_a, **_k: {"fs"},
+        )
+
+        tools, manager, infos = await resolve_and_load_mcp_tools(
+            trust_project_mcp=True,
+        )
+
+        assert tools == []
+        assert manager is None
+        assert mock_load.call_count == 0
+        assert [i.name for i in infos if i.status == "disabled"] == ["fs"]
+
+    @patch("deepagents_code.mcp_tools._load_tools_from_config")
+    @patch("deepagents_code.mcp_tools.discover_mcp_configs")
+    async def test_disabled_non_dict_config_gets_unknown_transport(
+        self,
+        mock_discover: MagicMock,
+        mock_load: AsyncMock,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Non-dict server config in the disabled set surfaces `transport=unknown`."""
+        cfg = tmp_path / "mcp.json"
+        # Force a non-dict server entry into the merged config. JSON does
+        # not preserve type fidelity across all loaders, so we monkeypatch
+        # merge_mcp_configs to return a known-shape payload.
+        cfg.write_text(
+            json.dumps({"mcpServers": {"weird": {"command": "x"}}}),
+        )
+        mock_discover.return_value = [cfg]
+        mock_load.return_value = ([], None, [])
+        monkeypatch.setattr(
+            "deepagents_code.mcp_disabled.get_disabled_servers",
+            lambda *_a, **_k: {"weird"},
+        )
+        monkeypatch.setattr(
+            "deepagents_code.mcp_tools.merge_mcp_configs",
+            lambda _configs: {"mcpServers": {"weird": "not-a-dict"}},
+        )
+
+        _tools, _manager, infos = await resolve_and_load_mcp_tools(
+            trust_project_mcp=True,
+        )
+
+        disabled = [i for i in infos if i.status == "disabled"]
+        assert len(disabled) == 1
+        assert disabled[0].name == "weird"
+        assert disabled[0].transport == "unknown"
 
 
 class TestDiscoveryHelpers:
@@ -1776,7 +2036,7 @@ class TestCachedSessionProxy:
 
         with patch("langchain_mcp_adapters.sessions.create_session", _fake):
             tools, manager, _ = await get_mcp_tools(path)
-            with pytest.raises(ToolException, match="deepagents mcp login srv"):
+            with pytest.raises(ToolException, match="re-authentication"):
                 await tools[0].ainvoke({})  # ty: ignore[missing-typed-dict-key]
 
         assert call_counter["n"] == 2

@@ -1,6 +1,7 @@
 """Tests for command-line argument parsing."""
 
 import argparse
+import asyncio
 import io
 import os
 import sys
@@ -60,11 +61,11 @@ def test_shell_allow_list_not_specified(mock_argv: MockArgvType) -> None:
 def test_shell_allow_list_combined_with_other_args(mock_argv: MockArgvType) -> None:
     """Test that shell-allow-list works with other arguments."""
     with mock_argv(
-        "--shell-allow-list", "ls,cat", "--model", "gpt-4o", "--auto-approve"
+        "--shell-allow-list", "ls,cat", "--model", "gpt-5.5", "--auto-approve"
     ):
         parsed_args = parse_args()
         assert parsed_args.shell_allow_list == "ls,cat"
-        assert parsed_args.model == "gpt-4o"
+        assert parsed_args.model == "gpt-5.5"
         assert parsed_args.auto_approve is True
 
 
@@ -366,6 +367,177 @@ class TestMaxTurnsArgument:
         assert exc_info.value.code == 2
 
 
+def _wait_for_timeout(mock_wait_for: MagicMock) -> object:
+    """Extract the `timeout` arg from a mocked `asyncio.wait_for` call.
+
+    Handles both positional and keyword call styles so the assertion does not
+    depend on how production code passes the argument.
+    """
+    import inspect
+
+    call = mock_wait_for.call_args
+    bound = inspect.signature(asyncio.wait_for).bind(*call.args, **call.kwargs)
+    return bound.arguments["timeout"]
+
+
+class TestTimeoutArgument:
+    """Tests for --timeout argument parsing, validation, and runtime behavior."""
+
+    def test_parses_integer(self, mock_argv: MockArgvType) -> None:
+        """--timeout N stores an integer."""
+        with mock_argv("-n", "task", "--timeout", "60"):
+            parsed = parse_args()
+            assert parsed.timeout == 60
+
+    def test_not_specified_is_none(self, mock_argv: MockArgvType) -> None:
+        """Timeout is None when --timeout is not provided."""
+        with mock_argv():
+            parsed = parse_args()
+            assert parsed.timeout is None
+
+    def test_combined_with_non_interactive(self, mock_argv: MockArgvType) -> None:
+        """--timeout works alongside -n and --max-turns."""
+        with mock_argv("-n", "run tests", "--timeout", "120", "--max-turns", "10"):
+            parsed = parse_args()
+            assert parsed.non_interactive_message == "run tests"
+            assert parsed.timeout == 120
+            assert parsed.max_turns == 10
+
+    def test_requires_non_interactive_mode(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """--timeout without -n or piped stdin exits with code 2 and warns on stderr."""
+        from deepagents_code.main import cli_main
+
+        mock_stdin = MagicMock()
+        mock_stdin.isatty.return_value = True
+        with (
+            patch.object(sys, "argv", ["deepagents", "--timeout", "30"]),
+            patch.object(sys, "stdin", mock_stdin),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            cli_main()
+        assert exc_info.value.code == 2
+        stderr = capsys.readouterr().err
+        assert "--timeout" in stderr
+        assert "-n" in stderr
+
+    def test_allowed_with_piped_stdin(self) -> None:
+        """--timeout without -n is allowed when stdin is piped.
+
+        Also asserts that `max_turns` (None by default) is still forwarded to
+        `run_non_interactive`, guarding against kwarg drops in the surrounding
+        try/except refactor.
+        """
+        from deepagents_code.main import cli_main
+
+        mock_stdin = MagicMock()
+        mock_stdin.isatty.return_value = False
+        mock_stdin.read.return_value = "piped task"
+        with (
+            patch.object(
+                sys,
+                "argv",
+                ["deepagents", "--timeout", "30", "--max-turns", "5"],
+            ),
+            patch.object(sys, "stdin", mock_stdin),
+            patch("deepagents_code.main.check_optional_tools", return_value=[]),
+            patch("os.open", side_effect=OSError("No tty in test sandbox")),
+            patch(
+                "deepagents_code.non_interactive.run_non_interactive",
+                new_callable=AsyncMock,
+                return_value=0,
+            ) as mock_run,
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            cli_main()
+        assert exc_info.value.code == 0
+        mock_run.assert_awaited_once()
+        await_args = mock_run.await_args
+        assert await_args is not None
+        assert await_args.kwargs["max_turns"] == 5
+
+    def test_forwarded_via_wait_for(self) -> None:
+        """--timeout value is used as the asyncio.wait_for timeout."""
+        from deepagents_code.main import cli_main
+
+        mock_stdin = MagicMock()
+        mock_stdin.isatty.return_value = True
+        with (
+            patch.object(
+                sys, "argv", ["deepagents", "-n", "do the thing", "--timeout", "45"]
+            ),
+            patch.object(sys, "stdin", mock_stdin),
+            patch("deepagents_code.main.check_optional_tools", return_value=[]),
+            patch(
+                "deepagents_code.non_interactive.run_non_interactive",
+                new_callable=AsyncMock,
+                return_value=0,
+            ),
+            patch("asyncio.wait_for", wraps=asyncio.wait_for) as mock_wait_for,
+            pytest.raises(SystemExit),
+        ):
+            cli_main()
+        assert _wait_for_timeout(mock_wait_for) == 45
+
+    def test_timeout_exits_124(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Exits with 124 and warns on stderr when `asyncio.TimeoutError` is raised."""
+        from deepagents_code.main import cli_main
+
+        mock_stdin = MagicMock()
+        mock_stdin.isatty.return_value = True
+        with (
+            patch.object(
+                sys, "argv", ["deepagents", "-n", "slow task", "--timeout", "1"]
+            ),
+            patch.object(sys, "stdin", mock_stdin),
+            patch("deepagents_code.main.check_optional_tools", return_value=[]),
+            patch(
+                "asyncio.wait_for",
+                side_effect=asyncio.TimeoutError,
+            ),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            cli_main()
+        assert exc_info.value.code == 124
+        stderr = capsys.readouterr().err
+        assert "timed out" in stderr
+        assert "1s" in stderr
+
+    def test_no_timeout_when_omitted(self) -> None:
+        """When --timeout is omitted, wait_for is called with timeout=None."""
+        from deepagents_code.main import cli_main
+
+        mock_stdin = MagicMock()
+        mock_stdin.isatty.return_value = True
+        with (
+            patch.object(sys, "argv", ["deepagents", "-n", "do the thing"]),
+            patch.object(sys, "stdin", mock_stdin),
+            patch("deepagents_code.main.check_optional_tools", return_value=[]),
+            patch(
+                "deepagents_code.non_interactive.run_non_interactive",
+                new_callable=AsyncMock,
+                return_value=0,
+            ),
+            patch("asyncio.wait_for", wraps=asyncio.wait_for) as mock_wait_for,
+            pytest.raises(SystemExit),
+        ):
+            cli_main()
+        assert _wait_for_timeout(mock_wait_for) is None
+
+    @pytest.mark.parametrize("bad_value", ["0", "-1", "-60", "abc"])
+    def test_rejects_non_positive_and_non_integer(
+        self, mock_argv: MockArgvType, bad_value: str
+    ) -> None:
+        """Argparse rejects 0, negatives, and non-integers with exit 2."""
+        with (
+            mock_argv("-n", "task", "--timeout", bad_value),
+            pytest.raises(SystemExit) as exc_info,
+        ):
+            parse_args()
+        assert exc_info.value.code == 2
+
+
 class TestModelParamsArgument:
     """Tests for --model-params argument parsing."""
 
@@ -385,12 +557,12 @@ class TestModelParamsArgument:
         """Test --model-params works alongside --model."""
         with mock_argv(
             "--model",
-            "gpt-4o",
+            "gpt-5.5",
             "--model-params",
             '{"temperature": 0.5, "max_tokens": 2048}',
         ):
             parsed = parse_args()
-            assert parsed.model == "gpt-4o"
+            assert parsed.model == "gpt-5.5"
             assert parsed.model_params == '{"temperature": 0.5, "max_tokens": 2048}'
 
 
@@ -413,12 +585,12 @@ class TestProfileOverrideArgument:
         """--profile-override works alongside --model."""
         with mock_argv(
             "--model",
-            "gpt-4o",
+            "gpt-5.5",
             "--profile-override",
             '{"max_input_tokens": 4096}',
         ):
             parsed = parse_args()
-            assert parsed.model == "gpt-4o"
+            assert parsed.model == "gpt-5.5"
             assert parsed.profile_override == '{"max_input_tokens": 4096}'
 
     def test_invalid_json_exits(self) -> None:

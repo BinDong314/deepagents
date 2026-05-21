@@ -12,6 +12,7 @@ import pytest
 from langchain.agents.middleware import AgentMiddleware
 from langchain.agents.middleware.types import ModelRequest, ModelResponse
 from langchain.tools import ToolRuntime
+from langchain_core.exceptions import ContextOverflowError
 from langchain_core.language_models import LanguageModelInput
 from langchain_core.language_models.fake_chat_models import GenericFakeChatModel
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -77,11 +78,11 @@ def backend(request: pytest.FixtureRequest, tmp_path: Path) -> BackendProtocol:
 
 
 def prepopulate_file(backend: BackendProtocol, file_path: str, content: str) -> dict[str, Any] | None:
-    """Write a file to the backend, returning starter ``files`` for StateBackend.
+    """Write a file to the backend, returning starter `files` for StateBackend.
 
     For external backends (filesystem, store) the write happens immediately.
     For StateBackend, the file data is returned as a dict that should be
-    passed via ``agent.invoke({"files": ...})`` since StateBackend requires
+    passed via `agent.invoke({"files": ...})` since StateBackend requires
     a LangGraph execution context.
     """
     if isinstance(backend, StateBackend):
@@ -2052,12 +2053,12 @@ class TestLargeHumanMessageEviction:
     """Test that oversized HumanMessages are evicted to the filesystem."""
 
     def test_large_human_message_evicted_before_model_call(self) -> None:
-        """An oversized HumanMessage is evicted and tagged with ``lc_evicted_to``.
+        """An oversized HumanMessage is evicted and tagged with `lc_evicted_to`.
 
         The agent receives a HumanMessage (no id) whose text content exceeds
-        the eviction threshold. The filesystem middleware's ``wrap_model_call``
+        the eviction threshold. The filesystem middleware's `wrap_model_call`
         should write the full content to the backend and tag the message in
-        state via ``lc_evicted_to``, while preserving the original content.
+        state via `lc_evicted_to`, while preserving the original content.
         The model should see a truncated preview, not the full content.
         """
         threshold = 50_000
@@ -2156,10 +2157,10 @@ class TestSummarizationOffloadToState:
     def test_offloaded_file_persisted_in_state(self) -> None:
         """Summarization should write the offloaded history to state via files_update.
 
-        Uses ``create_deep_agent`` with default ``StateBackend`` so that
-        ``backend.write`` returns a ``files_update`` dict. The ``Command``
-        produced by ``wrap_model_call`` must propagate that dict so the file
-        is persisted in graph state under the ``files`` channel.
+        Uses `create_deep_agent` with default `StateBackend` so that
+        `backend.write` returns a `files_update` dict. The `Command`
+        produced by `wrap_model_call` must propagate that dict so the file
+        is persisted in graph state under the `files` channel.
         """
         fake_model = FakeChatModelWithHistory(
             messages=iter(
@@ -2220,9 +2221,9 @@ class TestCompactConversationTool:
     def test_compact_conversation_tool_invocation(self) -> None:
         """Agent invokes compact_conversation and conversation is compacted.
 
-        Uses ``create_summarization_tool_middleware`` with a fake model that
+        Uses `create_summarization_tool_middleware` with a fake model that
         has a profile so fraction-based defaults are used. Input messages
-        carry ``usage_metadata`` and ``response_metadata`` so the eligibility
+        carry `usage_metadata` and `response_metadata` so the eligibility
         gate passes. The summarization model (same fake instance) returns a
         summary, and the agent model emits the tool call then a final response.
         """
@@ -2430,7 +2431,7 @@ class TestStateBackendConfigKeys:
         assert "/data/notes.md" in ls_msg.content
 
     def test_backward_compat_lambda_factory(self) -> None:
-        """The old ``lambda rt: StateBackend(rt)`` factory pattern still works."""
+        """The old `lambda rt: StateBackend(rt)` factory pattern still works."""
         model = FixedGenericFakeChatModel(
             messages=iter(
                 [
@@ -2922,10 +2923,10 @@ class TestArtifactsRoot:
 class TestAsyncSubagentEndToEnd:
     """End-to-end tests for async (non-blocking) subagent tools.
 
-    These tests wire up ``create_deep_agent`` with ``AsyncSubAgent`` specs and
+    These tests wire up `create_deep_agent` with `AsyncSubAgent` specs and
     mock the LangGraph SDK client to verify the full agent loop: model emits a
     tool call → tool executes against the (mocked) remote server → state is
-    updated with ``async_tasks`` → model sees the result and responds.
+    updated with `async_tasks` → model sees the result and responds.
     """
 
     @patch("deepagents.middleware.async_subagents.get_sync_client")
@@ -3582,7 +3583,7 @@ class TestDeltaChannels:
 
 def test_invalid_tool_call_patched_on_next_turn() -> None:
     # Turn 1: model truncates and emits an invalid tool call (no matching ToolMessage
-    # will be produced because agents only route on ``tool_calls``).
+    # will be produced because agents only route on `tool_calls`).
     # Turn 2: the middleware must patch the dangling call before the model is re-invoked.
     fake_model = FakeChatModelWithHistory(
         messages=iter(
@@ -3623,3 +3624,177 @@ def test_invalid_tool_call_patched_on_next_turn() -> None:
 
     # Final state must also expose the patched ToolMessage.
     assert any(isinstance(m, ToolMessage) and m.tool_call_id == "call_truncated" for m in result["messages"])
+
+
+_OVERFLOW_INPUT_CHAR_THRESHOLD = 50_000
+
+
+class _OverflowOnLargeInputModel(FakeChatModelWithHistory):
+    """Raises `ContextOverflowError` on any call whose input exceeds the char threshold.
+
+    Calls below the threshold pass through to the iterator (initial agent call,
+    summary-generation calls, post-clip retry). Raising on every over-threshold
+    call -- including the retry -- gives tests a built-in correctness check:
+    if clipping fails to reduce input below the threshold, the retry raises
+    and the test fails visibly.
+    """
+
+    def _generate(self, messages, stop=None, run_manager=None, **kwargs: Any):  # type: ignore[override]
+        total_chars = sum(len(m.content) for m in messages if isinstance(m.content, str))
+        if total_chars > _OVERFLOW_INPUT_CHAR_THRESHOLD:
+            self.call_history.append(
+                {"messages": messages, "kwargs": {"stop": stop, "run_manager": run_manager, **kwargs}, "tools": self.tools, "raised": True}
+            )
+            msg = "simulated overflow"
+            raise ContextOverflowError(msg)
+        return super()._generate(messages, stop, run_manager, **kwargs)
+
+
+def _make_parallel_tool_tail(
+    tool_name: str,
+    per_tm_chars: int,
+    n_tools: int = 4,
+    args_builder: Callable[[int], dict[str, Any]] | None = None,
+) -> list[Any]:
+    """Build [Human, AI(n_tools `tool_name` calls), n_tools x ToolMessage(per_tm_chars)].
+
+    Args:
+        tool_name: The tool name to use in each emitted tool_call.
+        per_tm_chars: Char length of each ToolMessage's content (all 'x').
+        n_tools: Number of parallel tool calls in the AI message.
+        args_builder: Optional `i -> args dict` mapper. Defaults to an empty args dict.
+    """
+    tool_call_ids = [f"tc_{i}" for i in range(n_tools)]
+    args_fn = args_builder if args_builder is not None else (lambda _i: {})
+    ai_msg = AIMessage(
+        content="",
+        tool_calls=[{"id": tcid, "name": tool_name, "args": args_fn(i), "type": "tool_call"} for i, tcid in enumerate(tool_call_ids)],
+    )
+    tool_msgs = [ToolMessage(content="x" * per_tm_chars, tool_call_id=tcid, name=tool_name) for tcid in tool_call_ids]
+    return [HumanMessage(content="query"), ai_msg, *tool_msgs]
+
+
+def test_summarization_clips_read_file_batch_on_overflow() -> None:
+    """End-to-end: 4 parallel real `read_file` calls hit pre-populated big files in state, then the clip path slices each.
+
+    Pre-populates `state["files"]` with 4 large files, has the fake model emit
+    4 parallel `read_file` tool_calls, lets the real `read_file` tool execute
+    against `StateBackend`, then triggers the overflow path and verifies:
+
+    - Each TM in state ends up as the read_file-specific slice (head + path
+      pointer to the original file).
+    - No `/large_tool_results/` files are written -- read_file's full content
+      already lives on the backend at the agent-passed path.
+    - The original files in state are untouched.
+    """
+    big_content = "\n".join(f"line {i}: " + "x" * 200 for i in range(120))  # ~25k chars, multi-line
+    initial_files = {f"/big_{i}.txt": {**create_file_data(big_content)} for i in range(4)}
+
+    fake_model = _OverflowOnLargeInputModel(
+        messages=iter(
+            [
+                AIMessage(
+                    content="",
+                    tool_calls=[
+                        {"id": f"tc_{i}", "name": "read_file", "args": {"file_path": f"/big_{i}.txt"}, "type": "tool_call"} for i in range(4)
+                    ],
+                ),
+                AIMessage(content="summary text"),
+                AIMessage(content="final response"),
+            ]
+        )
+    )
+    fake_model.call_history = []
+    fake_model.profile = {"max_input_tokens": 200_000}
+
+    agent = create_deep_agent(model=fake_model, checkpointer=InMemorySaver())
+    config = {"configurable": {"thread_id": "real-read-file-clip-test"}}
+
+    result = agent.invoke(
+        {"messages": [HumanMessage(content="read the files")], "files": initial_files},
+        config,
+    )
+
+    assert result["messages"][-1].content == "final response"
+
+    # Each ToolMessage in state should be the read_file-specific slice replacement.
+    state_tool_msgs = [m for m in result["messages"] if isinstance(m, ToolMessage)]
+    assert len(state_tool_msgs) == 4
+    for i, tm in enumerate(state_tool_msgs):
+        assert "Tool result too large" not in tm.content
+        assert f"/big_{i}.txt" in tm.content
+        assert "Output was truncated due to context window size limits" in tm.content
+        assert "Use read_file with offset and limit" in tm.content
+        # Sliced content is smaller than the original file.
+        assert len(tm.content) < len(big_content)
+
+    # No per-TM offload files were written -- read_file's full content is at the original path.
+    state = agent.get_state(config)
+    files = state.values.get("files", {})
+    assert not any(k.startswith("/large_tool_results/") for k in files)
+    # Original files are still intact.
+    for i in range(4):
+        assert f"/big_{i}.txt" in files
+
+
+def test_summarization_clips_ls_batch_on_overflow() -> None:
+    """On overflow with 4 parallel `ls` results, each TM is evicted via the generic offload.
+
+    `ls` isn't read_file, so the tail-clip path falls through to
+    `_offload_tool_message_content`: full content written under
+    `/large_tool_results/{tcid}` and the message replaced with a
+    `TOO_LARGE_TOOL_MSG` stub.
+    """
+    fake_model = _OverflowOnLargeInputModel(messages=iter([AIMessage(content="summary text"), AIMessage(content="final response")]))
+    fake_model.call_history = []
+    fake_model.profile = {"max_input_tokens": 200_000}
+
+    agent = create_deep_agent(model=fake_model, checkpointer=InMemorySaver())
+
+    input_messages = _make_parallel_tool_tail(
+        tool_name="ls",
+        per_tm_chars=25_000,
+        n_tools=4,
+        args_builder=lambda i: {"path": f"/dir_{i}"},
+    )
+    config = {"configurable": {"thread_id": "clip-ls-test"}}
+    result = agent.invoke({"messages": input_messages}, config)
+
+    assert len(fake_model.call_history) == 3
+    state_tool_msgs = [m for m in result["messages"] if isinstance(m, ToolMessage)]
+    assert len(state_tool_msgs) == 4
+    for tm in state_tool_msgs:
+        assert "Tool result too large" in tm.content
+        assert "/large_tool_results/" in tm.content
+
+    state = agent.get_state(config)
+    files = state.values.get("files", {})
+    for tcid in ("tc_0", "tc_1", "tc_2", "tc_3"):
+        assert f"/large_tool_results/{tcid}" in files, f"missing offload file for {tcid}"
+
+
+def test_summarization_clips_vanilla_tool_batch_on_overflow() -> None:
+    """On overflow with 4 parallel calls to an arbitrary user tool, each TM is evicted.
+
+    Same expected behavior as the `ls` test -- any non-read_file tool name routes
+    through the generic offload path.
+    """
+    fake_model = _OverflowOnLargeInputModel(messages=iter([AIMessage(content="summary text"), AIMessage(content="final response")]))
+    fake_model.call_history = []
+    fake_model.profile = {"max_input_tokens": 200_000}
+
+    agent = create_deep_agent(model=fake_model, checkpointer=InMemorySaver())
+
+    input_messages = _make_parallel_tool_tail(
+        tool_name="vendor_lookup",
+        per_tm_chars=25_000,
+        n_tools=4,
+        args_builder=lambda i: {"vendor_id": f"v_{i}"},
+    )
+    config = {"configurable": {"thread_id": "clip-vanilla-test"}}
+    _ = agent.invoke({"messages": input_messages}, config)
+
+    state = agent.get_state(config)
+    files = state.values.get("files", {})
+    for tcid in ("tc_0", "tc_1", "tc_2", "tc_3"):
+        assert f"/large_tool_results/{tcid}" in files, f"missing offload file for {tcid}"

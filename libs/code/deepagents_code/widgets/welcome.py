@@ -41,7 +41,8 @@ _TIPS: dict[str, int] = {
     "Try /threads to resume a previous conversation": 2,
     "Use /offload when your conversation gets long": 2,
     "Use /copy to copy the latest assistant message": 3,
-    "Use /mcp to see your loaded tools and servers": 1,
+    "Use /mcp to search your MCP servers and inspect tool parameters": 1,
+    "Use /mcp login <server> to authenticate MCP OAuth servers without leaving the TUI": 1,  # noqa: E501
     "Use /remember to save learnings from this conversation": 1,
     "Use /model to switch models mid-conversation": 2,
     "Press ctrl+x to compose prompts in your external editor": 1,
@@ -57,7 +58,6 @@ _TIPS: dict[str, int] = {
     "Press Shift+Tab to toggle auto-approve mode": 2,
     "Use --startup-cmd to run a shell command before the first prompt": 1,
     "Use !! for incognito shell commands that stay out of model context": 1,
-    "Run `deepagents mcp login <server>` to authorize a remote MCP server": 1,
     "Deep Agents can explain its own features and look up its docs. Ask it how to use.": 3,  # noqa: E501
 }
 """Rotating tips shown in the welcome footer, with relative selection weights.
@@ -75,6 +75,12 @@ submits a message before the agent is reachable. The timer is cancelled
 early when `set_connected`, `set_idle`, or `set_connecting` runs first, so
 this delay is the maximum — not a fixed wait.
 """
+
+_DOT_FRAMES: tuple[str, ...] = (".", "..", "...")
+"""Ellipsis animation frames cycled by the connecting-footer dot timer."""
+
+_DOT_INTERVAL = 0.4
+"""Seconds between connecting-footer ellipsis frame advances."""
 
 
 def _pick_tip() -> str:
@@ -151,9 +157,12 @@ class WelcomeBanner(Static):
         self._connecting = connecting
         self._resuming = resuming
         self._local_server = local_server
+        self._reconnecting = False
         self._idle = False
         self._defer_connecting_display = defer_connecting_display and connecting
         self._defer_timer: Timer | None = None
+        self._dot_frame: int = len(_DOT_FRAMES) - 1
+        self._dot_timer: Timer | None = None
         self._hide_langsmith_tracing = is_env_truthy(HIDE_LANGSMITH_TRACING)
         self._hide_splash_tips = is_env_truthy(HIDE_SPLASH_TIPS)
         self._project_name: str | None = (
@@ -173,12 +182,37 @@ class WelcomeBanner(Static):
             self._defer_timer = self.set_timer(
                 _CONNECTING_FOOTER_DELAY_SECONDS, self._on_defer_timer_fired
             )
+        elif self._connecting:
+            self._start_dot_animation()
 
     def _cancel_defer_timer(self) -> None:
         """Stop and drop the deferred-display timer if it is still pending."""
         if self._defer_timer is not None:
             self._defer_timer.stop()
             self._defer_timer = None
+
+    def _start_dot_animation(self) -> None:
+        """Start the ellipsis animation for the connecting footer.
+
+        No-op when the widget is not yet running (e.g., called before mount
+        or from sync test code): `set_interval` requires a live event loop.
+        """
+        if self._dot_timer is not None or not self._running:
+            return
+        self._dot_frame = len(_DOT_FRAMES) - 1
+        self._dot_timer = self.set_interval(_DOT_INTERVAL, self._tick_dots)
+
+    def _stop_dot_animation(self) -> None:
+        """Stop the ellipsis animation and reset to full dots."""
+        if self._dot_timer is not None:
+            self._dot_timer.stop()
+            self._dot_timer = None
+        self._dot_frame = len(_DOT_FRAMES) - 1
+
+    def _tick_dots(self) -> None:
+        """Advance the ellipsis frame and re-render the banner."""
+        self._dot_frame = (self._dot_frame + 1) % len(_DOT_FRAMES)
+        self.update(self._build_banner(self._project_url))
 
     def _on_defer_timer_fired(self) -> None:
         """Reveal the connecting footer once the deferral window expires."""
@@ -199,6 +233,7 @@ class WelcomeBanner(Static):
         self._cancel_defer_timer()
         self._defer_connecting_display = False
         if self._connecting:
+            self._start_dot_animation()
             self.update(self._build_banner(self._project_url))
 
     def _on_theme_change(self) -> None:
@@ -244,9 +279,11 @@ class WelcomeBanner(Static):
             mcp_errored: Number of MCP servers that failed to load.
         """
         self._connecting = False
+        self._reconnecting = False
         self._idle = False
         self._defer_connecting_display = False
         self._cancel_defer_timer()
+        self._stop_dot_animation()
         self._mcp_tool_count = mcp_tool_count
         self._mcp_unauthenticated = mcp_unauthenticated
         self._mcp_errored = mcp_errored
@@ -260,11 +297,14 @@ class WelcomeBanner(Static):
         currently reachable. Mid-session swaps show the connecting footer
         immediately — only the initial app launch defers it.
         """
+        self._stop_dot_animation()
         self._connecting = True
+        self._reconnecting = True
         self._idle = False
         self._resuming = False
         self._defer_connecting_display = False
         self._cancel_defer_timer()
+        self._start_dot_animation()
         self.update(self._build_banner(self._project_url))
 
     def set_idle(self) -> None:
@@ -277,9 +317,11 @@ class WelcomeBanner(Static):
         the chat error as the sole source of failure context.
         """
         self._connecting = False
+        self._reconnecting = False
         self._idle = True
         self._defer_connecting_display = False
         self._cancel_defer_timer()
+        self._stop_dot_animation()
         self.update(self._build_banner(self._project_url))
 
     def on_click(self, event: Click) -> None:  # noqa: PLR6301  # Textual event handler
@@ -386,7 +428,7 @@ class WelcomeBanner(Static):
             server_label = "server" if self._mcp_unauthenticated == 1 else "servers"
             unauth_text = (
                 f"{self._mcp_unauthenticated} MCP {server_label} need login "
-                "— run `deepagents mcp login <server>`\n"
+                "— open /mcp or run `/mcp login <server>`\n"
             )
             parts.extend(
                 [
@@ -413,6 +455,8 @@ class WelcomeBanner(Static):
                 build_connecting_footer(
                     resuming=self._resuming,
                     local_server=self._local_server,
+                    reconnecting=self._reconnecting,
+                    dots=_DOT_FRAMES[self._dot_frame],
                 )
             )
         elif not self._idle:
@@ -429,25 +473,38 @@ class WelcomeBanner(Static):
 
 
 def build_connecting_footer(
-    *, resuming: bool = False, local_server: bool = False
+    *,
+    resuming: bool = False,
+    local_server: bool = False,
+    reconnecting: bool = False,
+    dots: str = "...",
 ) -> Content:
     """Build a footer shown while waiting for the server to connect.
+
+    `resuming` wins over the other branches; otherwise `local_server`
+    selects between the local and generic variants, and `reconnecting`
+    swaps the verb only when `local_server` is `True`.
 
     Args:
         resuming: Show `'Resuming...'` instead of any `'Connecting...'` variant.
         local_server: Qualify the server as "local" in the connecting message.
-
-            Ignored when `resuming` is `True`.
+            Honored only when `resuming` is `False`.
+        reconnecting: Use `'Reconnecting'` instead of `'Connecting'` for
+            mid-session restarts. Honored only when `local_server` is `True`
+            and `resuming` is `False`.
+        dots: Ellipsis string appended to the status text. Pass an animated
+            frame (e.g. `"."`, `".."`, `"..."`) to show a cycling indicator.
 
     Returns:
         Content with a connecting status message.
     """
     if resuming:
-        text = "\nResuming...\n"
+        text = f"\nResuming{dots}\n"
     elif local_server:
-        text = "\nConnecting to local server...\n"
+        verb = "Reconnecting" if reconnecting else "Connecting"
+        text = f"\n{verb} to local server{dots}\n"
     else:
-        text = "\nConnecting to server...\n"
+        text = f"\nConnecting to server{dots}\n"
     return Content.styled(text, "dim")
 
 

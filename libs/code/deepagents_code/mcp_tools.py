@@ -9,6 +9,7 @@ and project-level locations.
 from __future__ import annotations
 
 import asyncio
+import copy
 import fnmatch
 import json
 import logging
@@ -41,9 +42,22 @@ class MCPToolInfo:
     description: str
     """Human-readable description of what the tool does."""
 
+    input_schema: dict[str, Any] | None = None
+    """Raw MCP `inputSchema` dict (JSON Schema), or `None` when unavailable.
 
-MCPServerStatus = Literal["ok", "unauthenticated", "error"]
-"""Load states a configured MCP server can end up in."""
+    Supplied directly from `mcp_tool.inputSchema` at tool-load time. The viewer
+    reads `properties` and `required` from this dict for parameter display;
+    `None` is rendered as "no parameters".
+    """
+
+
+MCPServerStatus = Literal["ok", "unauthenticated", "error", "disabled"]
+"""Load states a configured MCP server can end up in.
+
+`disabled` is set when the user has turned the server off via the TUI
+(`/mcp` -> F2). No connection is attempted and no tools are loaded, but
+the entry is still surfaced in the viewer so the user can re-enable it.
+"""
 
 
 @dataclass(frozen=True, slots=True)
@@ -54,14 +68,16 @@ class MCPServerInfo:
     """Server name from the MCP configuration."""
 
     transport: str
-    """Transport identifier — `stdio`, `sse`, `http`, or the synthetic
-    `config` value used for entries surfacing a bad config file."""
+    """Transport identifier — `stdio`, `sse`, `http`, the synthetic
+    `config` value used for entries surfacing a bad config file, or
+    `unknown` for a disabled server whose original config could not be
+    classified."""
 
     tools: tuple[MCPToolInfo, ...] = ()
     """Tools exposed by this server (empty when `status != "ok"`)."""
 
     status: MCPServerStatus = "ok"
-    """Load status — `ok`, `unauthenticated`, or `error`."""
+    """Load status — `ok`, `unauthenticated`, `error`, or `disabled`."""
 
     error: str | None = None
     """Human-readable reason when `status != "ok"`."""
@@ -166,7 +182,7 @@ def _connection_signature(value: Any) -> Any:  # noqa: ANN401
 
     if isinstance(value, dict):
         return tuple(
-            sorted((key, _connection_signature(item)) for key, item in value.items())
+            sorted((key, _connection_signature(item)) for key, item in value.items()),
         )
     if isinstance(value, list | tuple):
         return tuple(_connection_signature(item) for item in value)
@@ -179,7 +195,7 @@ def _connection_signature(value: Any) -> Any:  # noqa: ANN401
             "oauth",
             _connection_signature(context.server_url),
             _connection_signature(
-                context.client_metadata.model_dump(mode="json", exclude_none=True)
+                context.client_metadata.model_dump(mode="json", exclude_none=True),
             ),
             _connection_signature(storage_path),
             _connection_signature(context.timeout),
@@ -202,7 +218,7 @@ def _connections_signature(
         sorted(
             (name, _connection_signature(connection))
             for name, connection in connections.items()
-        )
+        ),
     )
 
 
@@ -251,7 +267,7 @@ class MCPSessionManager:
             return
 
         if _connections_signature(self._connections) != _connections_signature(
-            connections
+            connections,
         ):
             msg = "Cannot reconfigure MCP session manager after sessions are active"
             raise RuntimeError(msg)
@@ -316,7 +332,8 @@ class MCPSessionManager:
                 await asyncio.wait_for(self.invalidate(server_name), timeout=5.0)
             except TimeoutError:
                 logger.warning(
-                    "MCP session cleanup for %r timed out after 5s", server_name
+                    "MCP session cleanup for %r timed out after 5s",
+                    server_name,
                 )
             except (KeyboardInterrupt, SystemExit, asyncio.CancelledError):
                 raise
@@ -509,7 +526,8 @@ def _validate_server_config(server_name: str, server_config: dict[str, Any]) -> 
 
 
 def _validate_tool_filter_fields(
-    server_name: str, server_config: dict[str, Any]
+    server_name: str,
+    server_config: dict[str, Any],
 ) -> None:
     """Validate optional `allowedTools` / `disabledTools` fields.
 
@@ -655,7 +673,8 @@ discovery in `discover_mcp_configs` builds the same paths from
 
 
 def discover_mcp_configs(
-    *, project_context: ProjectContext | None = None
+    *,
+    project_context: ProjectContext | None = None,
 ) -> list[Path]:
     """Find MCP config files from standard locations.
 
@@ -1217,11 +1236,12 @@ async def _load_tools_from_config(
                         server_url=server_config["url"],
                     )
                     if await storage.get_tokens() is None:
-                        auth_msg = f"Run: deepagents mcp login {server_name}"
+                        auth_msg = (
+                            f"MCP server {server_name!r} needs re-authentication."
+                        )
                         logger.warning(
-                            "MCP server '%s' skipped: not authenticated. %s",
+                            "MCP server '%s' skipped: not authenticated.",
                             server_name,
-                            auth_msg,
                         )
                         skipped[server_name] = ("unauthenticated", auth_msg)
                         continue
@@ -1267,7 +1287,7 @@ async def _load_tools_from_config(
                     transport=transport,
                     status=status,
                     error=error,
-                )
+                ),
             )
             continue
 
@@ -1307,7 +1327,7 @@ async def _load_tools_from_config(
                     transport=transport,
                     status=status,
                     error=error,
-                )
+                ),
             )
             continue
 
@@ -1335,15 +1355,58 @@ async def _load_tools_from_config(
 
         server_tools = _apply_tool_filter(server_tools, server_name, server_config)
         all_tools.extend(server_tools)
+
+        # Pair each tool's input_schema by its LangChain (server-prefixed)
+        # name — the same form `server_tools` carries — so the lookup needs
+        # no string surgery and stays correct if `tool_name_prefix` ever
+        # changes. Deep-copy the raw dict because `MCPToolInfo` is `frozen`
+        # but Python's `frozen=True` does not freeze nested mutables; a
+        # shared reference would let one holder mutate every other's view.
+        schemas: dict[str, dict[str, Any] | None] = {}
+        for mcp_tool in mcp_tools:
+            tool_name = getattr(mcp_tool, "name", "")
+            try:
+                raw_schema = getattr(mcp_tool, "inputSchema", None)
+                schema_copy = (
+                    copy.deepcopy(raw_schema) if raw_schema is not None else None
+                )
+            except (AttributeError, TypeError, RecursionError) as exc:
+                logger.warning(
+                    "MCP tool %r on server %r: inputSchema access raised %s: %s; "
+                    "rendering with no parameters",
+                    tool_name,
+                    server_name,
+                    exc.__class__.__name__,
+                    exc,
+                )
+                schema_copy = None
+            lc_name = f"{server_name}_{tool_name}"
+            schemas[lc_name] = schema_copy
+
+        tool_infos: list[MCPToolInfo] = []
+        for tool in server_tools:
+            schema = schemas.get(tool.name)
+            if schema is None and schemas:
+                logger.debug(
+                    "MCP tool %r on server %r: no schema matched in lookup "
+                    "(available keys: %s); rendering with no parameters",
+                    tool.name,
+                    server_name,
+                    list(schemas.keys())[:5],
+                )
+            tool_infos.append(
+                MCPToolInfo(
+                    name=tool.name,
+                    description=tool.description or "",
+                    input_schema=schema,
+                ),
+            )
         server_infos.append(
             MCPServerInfo(
                 name=server_name,
                 transport=transport,
-                tools=tuple(
-                    MCPToolInfo(name=tool.name, description=tool.description or "")
-                    for tool in server_tools
-                ),
-            )
+                tools=tuple(tool_infos),
+            ),
         )
 
     all_tools.sort(key=lambda tool: tool.name)
@@ -1516,6 +1579,31 @@ async def resolve_and_load_mcp_tools(
     if not merged.get("mcpServers"):
         return [], None, _bad_config_infos()
 
+    from deepagents_code.mcp_disabled import get_disabled_servers
+
+    disabled_names = get_disabled_servers()
+    disabled_infos: list[MCPServerInfo] = []
+    if disabled_names:
+        active: dict[str, Any] = {}
+        for server_name, server_config in merged["mcpServers"].items():
+            if server_name in disabled_names:
+                disabled_infos.append(
+                    MCPServerInfo(
+                        name=server_name,
+                        transport=_resolve_server_type(server_config)
+                        if isinstance(server_config, dict)
+                        else "unknown",
+                        status="disabled",
+                        error="Disabled by user (`/mcp` F2 to re-enable).",
+                    ),
+                )
+            else:
+                active[server_name] = server_config
+        merged = {"mcpServers": active}
+
+    if not merged.get("mcpServers"):
+        return [], None, disabled_infos + _bad_config_infos()
+
     try:
         for server_name, server_config in merged["mcpServers"].items():
             _validate_server_config(server_name, server_config)
@@ -1528,5 +1616,6 @@ async def resolve_and_load_mcp_tools(
         stateless=stateless,
         session_manager=session_manager,
     )
+    server_infos.extend(disabled_infos)
     server_infos.extend(_bad_config_infos())
     return tools, manager, server_infos
